@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenStack Cost Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            gap: 20px;
+        }
+        .stat-card {
+            background-color: #3498db;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            flex: 1;
+        }
+        .stat-card h3 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .stat-card p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .chart-wrapper {
+            background-color: #fafafa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .chart-wrapper h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .data-table th, .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .data-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .data-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .last-updated {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+            .stats {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>OpenStack Cost Dashboard</h1>
+            <div class="last-updated" id="lastUpdated"></div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <h3 id="totalCost">€0.00</h3>
+                <p>Total Monthly Cost</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="serviceCount">0</h3>
+                <p>Active Services</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="avgCost">€0.00</h3>
+                <p>Average per Service</p>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn" onclick="refreshData()" id="refreshBtn">Refresh Data</button>
+            <button class="btn" onclick="toggleChartType()" id="chartTypeBtn">Switch to Pie Chart</button>
+        </div>
+        
+        <div class="charts-container">
+            <div class="chart-wrapper">
+                <h2>Cost by Service</h2>
+                <canvas id="costChart"></canvas>
+            </div>
+            <div class="chart-wrapper">
+                <h2>Top 5 Services</h2>
+                <canvas id="topServicesChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-wrapper">
+            <h2>Service Details</h2>
+            <div id="tableContainer">
+                <div class="loading">Loading data...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chartData = null;
+        let currentChartType = 'bar';
+        let costChart = null;
+        let topServicesChart = null;
+
+        // Initialize charts
+        async function initCharts() {
+            try {
+                const response = await fetch('/api/data');
+                chartData = await response.json();
+                updateUI();
+                createCharts();
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('tableContainer').innerHTML = '<div class="loading">Error loading data</div>';
+            }
+        }
+
+        function updateUI() {
+            if (!chartData) return;
+
+            // Update stats
+            document.getElementById('totalCost').textContent = `€${chartData.total_cost.toFixed(2)}`;
+            document.getElementById('serviceCount').textContent = chartData.service_count;
+            document.getElementById('avgCost').textContent = `€${chartData.average_cost.toFixed(2)}`;
+            document.getElementById('lastUpdated').textContent = `Last updated: ${chartData.last_updated}`;
+
+            // Update table
+            createTable();
+        }
+
+        function createCharts() {
+            if (!chartData) return;
+
+            // Colors for charts
+            const colors = [
+                '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+                '#1abc9c', '#34495e', '#e67e22', '#95a5a6', '#f1c40f'
+            ];
+
+            // Main cost chart
+            const costCtx = document.getElementById('costChart').getContext('2d');
+            if (costChart) costChart.destroy();
+            
+            costChart = new Chart(costCtx, {
+                type: currentChartType,
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Cost (€)',
+                        data: chartData.values,
+                        backgroundColor: colors,
+                        borderColor: colors.map(color => color + '80'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: currentChartType === 'pie'
+                        }
+                    },
+                    scales: currentChartType === 'bar' ? {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '€' + value.toFixed(2);
+                                }
+                            }
+                        }
+                    } : {}
+                }
+            });
+
+            // Top 5 services chart
+            const topCtx = document.getElementById('topServicesChart').getContext('2d');
+            if (topServicesChart) topServicesChart.destroy();
+            
+            const top5Labels = chartData.labels.slice(0, 5);
+            const top5Values = chartData.values.slice(0, 5);
+            
+            topServicesChart = new Chart(topCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: top5Labels,
+                    datasets: [{
+                        data: top5Values,
+                        backgroundColor: colors.slice(0, 5),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTable() {
+            if (!chartData) return;
+
+            let html = '<table class="data-table">';
+            html += '<thead><tr><th>Service</th><th>Monthly Cost</th><th>Percentage</th></tr></thead>';
+            html += '<tbody>';
+            
+            chartData.labels.forEach((label, index) => {
+                const cost = chartData.values[index];
+                const percentage = ((cost / chartData.total_cost) * 100).toFixed(1);
+                html += `<tr>
+                    <td>${label}</td>
+                    <td>€${cost.toFixed(4)}</td>
+                    <td>${percentage}%</td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('tableContainer').innerHTML = html;
+        }
+
+        async function refreshData() {
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            btn.textContent = 'Refreshing...';
+            
+            try {
+                await fetch('/api/refresh');
+                await initCharts();
+                btn.textContent = 'Refresh Data';
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+                btn.textContent = 'Refresh Failed';
+            } finally {
+                btn.disabled = false;
+                setTimeout(() => {
+                    btn.textContent = 'Refresh Data';
+                }, 2000);
+            }
+        }
+
+        function toggleChartType() {
+            currentChartType = currentChartType === 'bar' ? 'pie' : 'bar';
+            document.getElementById('chartTypeBtn').textContent = 
+                currentChartType === 'bar' ? 'Switch to Pie Chart' : 'Switch to Bar Chart';
+            createCharts();
+        }
+
+        // Auto-refresh every 5 minutes
+        setInterval(async () => {
+            await initCharts();
+        }, 300000);
+
+        // Initialize on page load
+        window.addEventListener('load', initCharts);
+    </script>
+</body>
+</html>
