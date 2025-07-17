@@ -197,13 +197,29 @@ impl DataService {
                     Ok(date) => date.format("%Y-%m-%dT00:00:00+00:00").to_string(),
                     Err(e) => {
                         warn!("Invalid date format '{}', using current date: {}", d, e);
-                        Local::now().format("%Y-%m-01T00:00:00+00:00").to_string()
+                        if is_end_date {
+                            Local::now()
+                                .with_day(chrono::NaiveDate::from_ymd_opt(
+                                    Local::now().year(),
+                                    Local::now().month(),
+                                    1,
+                                )
+                                .unwrap()
+                                .with_month0(Local::now().month0() + 1)
+                                .unwrap()
+                                .pred()
+                                .day())
+                                .unwrap()
+                                .format("%Y-%m-%dT23:59:59+00:00")
+                                .to_string()
+                        } else {
+                            Local::now().format("%Y-%m-01T00:00:00+00:00").to_string()
+                        }
                     }
                 }
             }
-            None => Local::now().format("%Y-%m-01T00:00:00+00:00").to_string(),
-        }
-    }
+            None => if is_end_date {
+                            Local::now()
     
     /// Create a redacted version of command arguments for safe logging
     fn redact_sensitive_args(&self, args: &[String]) -> Vec<String> {
