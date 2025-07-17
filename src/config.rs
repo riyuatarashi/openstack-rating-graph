@@ -103,7 +103,7 @@ impl Config {
         });
         
         let os_region_name = env::var("OS_REGION_NAME").unwrap_or_else(|_| {
-            warn!("OS_REGION_NAME not set - OpenStack data may unuseful");
+            warn!("OS_REGION_NAME not set - OpenStack data may not be useful");
             String::new()
         });
         
