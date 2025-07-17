@@ -11,6 +11,7 @@ mod server;
 mod cache;
 
 use std::sync::Arc;
+use chrono::Local;
 use tokio::sync::RwLock;
 
 use crate::models::ChartData;
@@ -43,7 +44,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let data_service = DataService::new(config.clone(), cache.clone());
     
     // Fetch initial data
-    let initial_data = data_service.fetch_data().await;
+    let initial_data = data_service.fetch_data(
+        Option::from(Local::now().format("%Y-%m-01").to_string()),
+        Option::from(Local::now().format("%Y-%m-%d").to_string())
+    ).await;
+
     let chart_data = data_service.process_data(initial_data);
     let chart_data_state = Arc::new(RwLock::new(chart_data));
     
