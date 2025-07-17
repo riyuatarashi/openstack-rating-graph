@@ -149,13 +149,15 @@
         </div>
         
         <div class="controls">
+            <label for="beginAt">From : <input id="beginAt" type="date"/></label>
+            <label for="endAt">To : <input id="endAt" type="date"/></label>
             <button class="btn" onclick="refreshData()" id="refreshBtn">Refresh Data</button>
             <button class="btn" onclick="toggleChartType()" id="chartTypeBtn">Switch to Pie Chart</button>
         </div>
         
         <div class="charts-container">
             <div class="chart-wrapper">
-                <h2>Cost by Service</h2>
+                <h2>Cost of Service</h2>
                 <canvas id="costChart"></canvas>
             </div>
             <div class="chart-wrapper">
@@ -173,9 +175,15 @@
     </div>
 
     <script>
-        let chartData = null;
+        let chartData = {
+            service_count: undefined,
+            total_cost: undefined,
+            average_cost: undefined,
+            last_updated: undefined
+        };
+
         let currentChartType = 'bar';
-        let costChart = null;
+        let costChart = new Chart();
         let topServicesChart = null;
 
         // Initialize charts
@@ -240,9 +248,6 @@
                         y: {
                             beginAtZero: true,
                             ticks: {
-                                callback: function(value) {
-                                    return '€' + value.toFixed(2);
-                                }
                             }
                         }
                     } : {}
@@ -300,12 +305,14 @@
         }
 
         async function refreshData() {
+            const beginAt = document.getElementById('beginAt').value;
+            const endAt = document.getElementById('endAt').value;
             const btn = document.getElementById('refreshBtn');
             btn.disabled = true;
             btn.textContent = 'Refreshing...';
             
             try {
-                await fetch('/api/refresh');
+                await fetch('/api/refresh?begin_at=' + beginAt + '&end_at=' + endAt);
                 await initCharts();
                 btn.textContent = 'Refresh Data';
             } catch (error) {
@@ -331,7 +338,7 @@
             await initCharts();
         }, 300000);
 
-        // Initialize on page load
+        // Initialize on a page load
         window.addEventListener('load', initCharts);
     </script>
 </body>
