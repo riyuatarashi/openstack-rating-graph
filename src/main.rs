@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::new();
     
     // Initialize cache
-    let cache = Arc::new(crate::cache::OpenStackCache::new(std::time::Duration::from_secs(300)));
+    let cache = Arc::new(cache::OpenStackCache::new(std::time::Duration::from_secs(300)));
     
     // Initialize data service
     let data_service = DataService::new(config.clone(), cache.clone());

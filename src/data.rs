@@ -75,7 +75,7 @@ impl DataService {
             "json".to_string(),
         ]);
         
-        // Generate cache key from command and args
+        // Generate a cache key from command and args
         let cache_key = self.cache.generate_key(&self.config.openstack_command, &args);
         
         // Check cache first
@@ -232,9 +232,12 @@ mod tests {
             os_username: String::new(),
             os_password: String::new(),
             os_project_id: String::new(),
+            os_region_name: "rc3-a".to_string(),
             os_user_domain_name: "Default".to_string(),
+            cache_ttl_seconds: 300,
         };
-        let service = DataService::new(config);
+        let cache = Arc::new(OpenStackCache::new(std::time::Duration::from_secs(300)));
+        let service = DataService::new(config, cache.clone());
         let date_string = service.get_date_string();
         
         // Test that the date matches the expected format: YYYY-MM-01T00:00:00+00:00
