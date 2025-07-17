@@ -65,7 +65,7 @@ impl Server {
                 interval.tick().await;
                 info!("Background refresh triggered");
                 
-                let new_data = bg_state.data_service.fetch_data().await;
+                let new_data = bg_state.data_service.fetch_data(None, None).await;
                 let new_chart_data = bg_state.data_service.process_data(new_data);
                 *bg_state.chart_data.write().await = new_chart_data;
                 info!("Background refresh completed successfully");

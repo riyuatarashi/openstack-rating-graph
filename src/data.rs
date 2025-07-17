@@ -24,9 +24,16 @@ impl DataService {
     }
 
     /// Fetch data from OpenStack CLI with caching
-    pub async fn fetch_data(&self) -> HashMap<String, f64> {
+    pub async fn fetch_data(&self, begin_at: Option<String>, end_at: Option<String>) -> HashMap<String, f64> {
         // Generate the date string in the same format as the shell command
-        let date_string = self.get_date_string();
+        let begin_at_date_string = self.get_date_string(begin_at);
+        let end_at_date_string = self.get_date_string(
+            Some(end_at.unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string()))
+        );
+
+        if !self.check_date_validity(Some(begin_at_date_string.clone()), Some(end_at_date_string.clone())) {
+            return HashMap::new();
+        }
         
         // Build arguments with authentication parameters
         let mut args = Vec::new();
@@ -68,7 +75,9 @@ impl DataService {
             "dataframes".to_string(),
             "get".to_string(),
             "-b".to_string(),
-            date_string,
+            begin_at_date_string,
+            "-e".to_string(),
+            end_at_date_string,
             "-c".to_string(),
             "Resources".to_string(),
             "-f".to_string(),
@@ -150,8 +159,8 @@ impl DataService {
         for wrapped in resources.into_iter() {
             for resource in wrapped.resources.into_iter() {
                 if let Ok(rating) = resource.rating.parse::<f64>() {
-                    let euro = rating / self.config.currency_rate;
-                    *data_map.entry(resource.service).or_insert(0.0) += euro;
+                    let cost = rating / self.config.currency_rate;
+                    *data_map.entry(resource.service).or_insert(0.0) += cost;
                 }
             }
         }
@@ -183,9 +192,54 @@ impl DataService {
         }
     }
 
+    pub fn check_date_validity(&self, start: Option<String>, end: Option<String>) -> bool {
+        if let (Some(start), Some(end)) = (start, end) {
+            let start_date = chrono::NaiveDate::parse_from_str(&start, "%Y-%m-%dT%H:%M:%S%z");
+            let end_date = chrono::NaiveDate::parse_from_str(&end, "%Y-%m-%dT%H:%M:%S%z");
+
+            match (start_date, end_date) {
+                (Ok(start_date), Ok(end_date)) => {
+                    let current_date = Local::now().date_naive();
+
+                    if start_date > end_date {
+                        warn!("Start date {} is after end date {}", start, end);
+                        false
+                    } else if start_date >= current_date || end_date > current_date {
+                        warn!("Date range cannot be in the future: start {}, end {}", start, end);
+                        false
+                    } else {
+                        true
+                    }
+                }
+                (Err(e), _) => {
+                    warn!("Invalid start date format '{}': {}", start, e);
+                    false
+                }
+                (_, Err(e)) => {
+                    warn!("Invalid end date format '{}': {}", end, e);
+                    false
+                }
+            }
+        } else {
+            true // If no dates provided, assume valid
+        }
+    }
+
     /// Get the formatted date string that would be used in the OpenStack command
-    pub fn get_date_string(&self) -> String {
-        Local::now().format("%Y-%m-01T00:00:00+00:00").to_string()
+    pub fn get_date_string(&self, date: Option<String>) -> String {
+        match date {
+            Some(d) => {
+                // Parse the provided date string
+                match chrono::NaiveDate::parse_from_str(&d, "%Y-%m-%d") {
+                    Ok(date) => date.format("%Y-%m-%dT00:00:00+00:00").to_string(),
+                    Err(e) => {
+                        warn!("Invalid date format '{}', using current date: {}", d, e);
+                        Local::now().format("%Y-%m-01T00:00:00+00:00").to_string()
+                    }
+                }
+            }
+            None => Local::now().format("%Y-%m-01T00:00:00+00:00").to_string(),
+        }
     }
     
     /// Create a redacted version of command arguments for safe logging
@@ -238,7 +292,7 @@ mod tests {
         };
         let cache = Arc::new(OpenStackCache::new(std::time::Duration::from_secs(300)));
         let service = DataService::new(config, cache.clone());
-        let date_string = service.get_date_string();
+        let date_string = service.get_date_string(None);
         
         // Test that the date matches the expected format: YYYY-MM-01T00:00:00+00:00
         let date_regex = Regex::new(r"^\d{4}-\d{2}-01T00:00:00\+00:00$").unwrap();

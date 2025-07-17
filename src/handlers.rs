@@ -5,10 +5,17 @@ use axum::{
     http::StatusCode,
     response::{Html, Json},
 };
+use axum::extract::Query;
+use serde::Deserialize;
 use tracing::info;
-
 use crate::models::ChartData;
 use crate::AppState;
+
+#[derive(Deserialize)]
+pub struct DateRange {
+    begin_at: Option<String>,
+    end_at: Option<String>,
+}
 
 /// Serve the main HTML page
 pub async fn serve_index() -> Html<String> {
@@ -22,10 +29,10 @@ pub async fn get_chart_data(State(state): State<AppState>) -> Json<ChartData> {
 }
 
 /// Refresh data manually
-pub async fn refresh_data(State(state): State<AppState>) -> Json<ChartData> {
+pub async fn refresh_data(State(state): State<AppState>, Query(date_range): Query<DateRange>) -> Json<ChartData> {
     info!("Manual refresh requested");
     
-    let new_data = state.data_service.fetch_data().await;
+    let new_data = state.data_service.fetch_data(date_range.begin_at, date_range.end_at).await;
     let new_chart_data = state.data_service.process_data(new_data);
     *state.chart_data.write().await = new_chart_data.clone();
     Json(new_chart_data)
