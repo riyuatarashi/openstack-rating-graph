@@ -28,8 +28,12 @@ impl DataService {
         // Generate the date string in the same format as the shell command
         let begin_at_date_string = self.get_date_string(begin_at);
         let end_at_date_string = self.get_date_string(
-            end_at.unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string())
+            Some(end_at.unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string()))
         );
+
+        if !self.check_date_validity(Some(begin_at_date_string.clone()), Some(end_at_date_string.clone())) {
+            return HashMap::new();
+        }
         
         // Build arguments with authentication parameters
         let mut args = Vec::new();
@@ -185,6 +189,39 @@ impl DataService {
             service_count,
             average_cost,
             last_updated: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        }
+    }
+
+    pub fn check_date_validity(&self, start: Option<String>, end: Option<String>) -> bool {
+        if let (Some(start), Some(end)) = (start, end) {
+            let start_date = chrono::NaiveDate::parse_from_str(&start, "%Y-%m-%dT%H:%M:%S%z");
+            let end_date = chrono::NaiveDate::parse_from_str(&end, "%Y-%m-%dT%H:%M:%S%z");
+
+            match (start_date, end_date) {
+                (Ok(start_date), Ok(end_date)) => {
+                    let current_date = Local::now().date_naive();
+
+                    if start_date > end_date {
+                        warn!("Start date {} is after end date {}", start, end);
+                        false
+                    } else if start_date >= current_date || end_date > current_date {
+                        warn!("Date range cannot be in the future: start {}, end {}", start, end);
+                        false
+                    } else {
+                        true
+                    }
+                }
+                (Err(e), _) => {
+                    warn!("Invalid start date format '{}': {}", start, e);
+                    false
+                }
+                (_, Err(e)) => {
+                    warn!("Invalid end date format '{}': {}", end, e);
+                    false
+                }
+            }
+        } else {
+            true // If no dates provided, assume valid
         }
     }
 
