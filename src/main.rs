@@ -45,8 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Fetch initial data
     let initial_data = data_service.fetch_data(
-        Option::from(Local::now().format("%Y-%m-01").to_string()),
-        Option::from(Local::now().format("%Y-%m-%d").to_string())
+        Some(Local::now().format("%Y-%m-01").to_string()),
+        Some(Local::now().format("%Y-%m-%d").to_string())
     ).await;
 
     let chart_data = data_service.process_data(initial_data);
