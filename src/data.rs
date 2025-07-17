@@ -27,10 +27,9 @@ impl DataService {
     pub async fn fetch_data(&self, begin_at: Option<String>, end_at: Option<String>) -> HashMap<String, f64> {
         // Generate the date string in the same format as the shell command
         let begin_at_date_string = self.get_date_string(begin_at);
-        let end_at_date_string = self.get_date_string(match end_at {
-            Some(end_at) => Some(end_at),
-            None => Some(Local::now().format("%Y-%m-%d").to_string()),
-        });
+        let end_at_date_string = self.get_date_string(
+            end_at.unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string())
+        );
         
         // Build arguments with authentication parameters
         let mut args = Vec::new();
