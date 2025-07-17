@@ -312,7 +312,7 @@
             btn.textContent = 'Refreshing...';
             
             try {
-                await fetch('/api/refresh?begin_at=' + beginAt + '&end_at=' + endAt);
+                await fetch('/api/refresh?begin_at=' + encodeURIComponent(beginAt) + '&end_at=' + encodeURIComponent(endAt));
                 await initCharts();
                 btn.textContent = 'Refresh Data';
             } catch (error) {
