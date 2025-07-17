@@ -1,5 +1,7 @@
 # OpenStack Cost Dashboard
 
+[![Testing](https://github.com/riyuatarashi/openstack-rating-graph/actions/workflows/testing.yaml/badge.svg)](https://github.com/riyuatarashi/openstack-rating-graph/actions/workflows/testing.yaml)
+
 A modern Rust web application that fetches OpenStack rating data and displays it in a beautiful Chart.js dashboard. Built with a clean, modular architecture for maintainability and extensibility.
 
 ## Features
